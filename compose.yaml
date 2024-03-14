@@ -1,0 +1,48 @@
+services:
+  postgresql:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    volumes:
+      - data:/var/lib/postgresql/data
+      - ./sql-init:/docker-entrypoint-initdb.d
+    environment:
+      - POSTGRES_PASSWORD=${SUPERUSER_DB_PASSWORD}
+      - BACKEND_PASSWORD=${BACKEND_DB_PASSWORD}
+    networks:
+      - database
+
+  pgbouncer:
+    image: bitnami/pgbouncer
+    environment:
+      - POSTGRESQL_USERNAME=backend
+      - POSTGRESQL_PASSWORD=${BACKEND_DB_PASSWORD}
+      - PGBOUNCER_DATABASE=ccc
+    depends_on:
+      - postgresql
+    networks:
+      - database
+      - default
+
+  python_flask:
+    image: ccc/python-flask-backend
+    build: ./backends/python-flask/
+    environment:
+      - DB_PASSWORD=${BACKEND_DB_PASSWORD}
+    depends_on:
+      - pgbouncer
+
+  crystal_kemal:
+    image: ccc/crystal-kemal-backend
+    build: ./backends/crystal-kemal/
+    environment:
+      - DB_PASSWORD=${BACKEND_DB_PASSWORD}
+    depends_on:
+      - pgbouncer
+
+volumes:
+  data:
+
+networks:
+  database:
+    driver: bridge
