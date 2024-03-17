@@ -1,4 +1,1 @@
 .env
-.venv
-__pycache__
-backends/crystal-kemal/lib
