@@ -1,0 +1,78 @@
+version: '3'
+
+x-backend-config: &backend_config
+  environment:
+    - DB_HOST=pgbouncer
+    - DB_PORT=6432
+    - DB_USERNAME=backend
+    - DB_PASSWORD=${BACKEND_DB_PASSWORD}
+    - DB_NAME=ccc
+  depends_on:
+    - pgbouncer
+    - traefik
+  labels:
+    traefik.enable: true
+    traefik.http.routers.backend.rule: HeadersRegexp(`Accept`, `application/json`)
+    traefik.http.services.backend.loadbalancer.healthcheck.path: /ping
+
+services:
+  python_flask:
+    <<: *backend_config
+    image: "${REGISTRY_ACCOUNT}/python-flask-backend"
+    build: ./backends/python-flask/
+
+  crystal_kemal:
+    <<: *backend_config
+    image: "${REGISTRY_ACCOUNT}/crystal-kemal-backend"
+    build: ./backends/crystal-kemal/
+
+  frontend:
+    image: "${REGISTRY_ACCOUNT}/frontend"
+    build: ./frontend
+    depends_on:
+      - traefik
+    labels:
+      traefik.enable: true
+      traefik.http.routers.frontend.rule: PathPrefix(`/`)
+
+  postgresql:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    volumes:
+      - data:/var/lib/postgresql/data
+      - ./sql-init:/docker-entrypoint-initdb.d
+    environment:
+      - POSTGRES_PASSWORD=${SUPERUSER_DB_PASSWORD}
+      - BACKEND_PASSWORD=${BACKEND_DB_PASSWORD}
+    networks:
+      - database
+
+  pgbouncer:
+    image: bitnami/pgbouncer
+    environment:
+      - POSTGRESQL_USERNAME=backend
+      - POSTGRESQL_PASSWORD=${BACKEND_DB_PASSWORD}
+      - PGBOUNCER_DATABASE=ccc
+    depends_on:
+      - postgresql
+    networks:
+      - database
+      - default
+
+  traefik:
+    image: traefik
+    command:
+      - --providers.docker
+      - --providers.docker.exposedbydefault=false
+    ports:
+      - 80:80
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+volumes:
+  data:
+
+networks:
+  database:
+    driver: bridge

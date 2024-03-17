@@ -7,5 +7,6 @@ RUN crystal build --release --static app.cr
 FROM alpine
 WORKDIR "/app"
 COPY --from=build /src/app .
-EXPOSE 80
-CMD /app/app -p 80
+EXPOSE 3000
+STOPSIGNAL SIGINT
+CMD /app/app
